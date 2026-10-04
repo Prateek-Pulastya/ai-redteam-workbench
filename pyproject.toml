@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "airteam"
+version = "0.0.1"
+description = "Open-source security testing for AI applications and their APIs, with oracle-confirmed evidence and regression."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Prateek Pulastya" }]
+keywords = ["ai-security", "llm-security", "api-security", "prompt-injection", "red-teaming"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.8",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "typer>=0.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/Prateek-Pulastya/ai-redteam-workbench"
+Source = "https://github.com/Prateek-Pulastya/ai-redteam-workbench"
+Issues = "https://github.com/Prateek-Pulastya/ai-redteam-workbench/issues"
+Changelog = "https://github.com/Prateek-Pulastya/ai-redteam-workbench/blob/main/CHANGELOG.md"
+
+[project.scripts]
+airteam = "airteam.cli.main:app"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.100",
+    "mypy>=1.11",
+    "pre-commit>=3.7",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "types-pyyaml>=6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/airteam"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]  # asserts and deliberately fake tokens
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

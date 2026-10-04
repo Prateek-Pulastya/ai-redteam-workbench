@@ -1,0 +1,49 @@
+# AI Red-Team Workbench assessment configuration.
+# Never put real credentials in this file: identities reference environment variables.
+
+project:
+  name: demo-assessment
+
+target:
+  name: playground
+  type: hybrid
+  endpoint: http://localhost:8000
+  variant: vulnerable
+  authorization:
+    mode: local          # loopback only; use "authorized" for remote targets you may test
+    scope:
+      - localhost
+      - 127.0.0.1
+
+api:
+  openapi: ./playground/api/openapi.yaml
+  identities:
+    - name: user_a
+      token_env: USER_A_TOKEN
+    - name: user_b
+      token_env: USER_B_TOKEN
+    - name: admin
+      token_env: ADMIN_TOKEN
+      role: admin
+  ownership:
+    - identity: user_a
+      resources:
+        "/orders/{id}": [101, 102]
+    - identity: user_b
+      resources:
+        "/orders/{id}": [201]
+
+ai:
+  endpoint: http://localhost:8000/chat
+  provider: mock
+
+scan:
+  max_requests: 100
+  max_tokens: 10000
+  timeout_seconds: 30
+  max_retries: 2
+
+policy:
+  fail_on:
+    - critical
+    - high
