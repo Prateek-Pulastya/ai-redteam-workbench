@@ -2,13 +2,17 @@
 
 from collections.abc import Sequence
 from enum import StrEnum
+from typing import Any, Self
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, model_validator
 
 from airteam.core.base import Slug, StrictModel
 from airteam.core.frameworks import FrameworkMapping
 from airteam.core.oracles import OracleKind
+from airteam.core.stats import Interval, wilson_interval
 from airteam.core.trials import Trial
+
+_DERIVED = frozenset({"rate", "ci95"})
 
 
 class Severity(StrEnum):
@@ -17,6 +21,12 @@ class Severity(StrEnum):
     MEDIUM = "medium"
     LOW = "low"
     INFO = "info"
+
+
+def most_severe_first(findings: Sequence["Finding"]) -> list["Finding"]:
+    """Stable display order: severity (critical first), then finding ID."""
+    rank = {s: i for i, s in enumerate(Severity)}
+    return sorted(findings, key=lambda f: (rank[f.severity], f.finding_id))
 
 
 class Confidence(StrEnum):
@@ -50,6 +60,21 @@ class Reproducibility(StrictModel):
     hits: int = Field(ge=0)
     valid_trials: int = Field(ge=0)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_derived(cls, data: Any) -> Any:
+        # ``rate`` and ``ci95`` are serialized for readers but recomputed on load,
+        # so a dumped finding validates again under ``extra="forbid"``.
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if k not in _DERIVED}
+        return data
+
+    @model_validator(mode="after")
+    def _hits_within_trials(self) -> Self:
+        if self.hits > self.valid_trials:
+            raise ValueError(f"hits={self.hits} exceeds valid_trials={self.valid_trials}")
+        return self
+
     @classmethod
     def from_trials(cls, trials: Sequence[Trial]) -> "Reproducibility":
         valid = [t for t in trials if t.valid]
@@ -59,6 +84,12 @@ class Reproducibility(StrictModel):
     @property
     def rate(self) -> float | None:
         return None if self.valid_trials == 0 else self.hits / self.valid_trials
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def ci95(self) -> Interval | None:
+        """Wilson 95% interval on ``rate``; ``None`` without valid trials."""
+        return None if self.valid_trials == 0 else wilson_interval(self.hits, self.valid_trials)
 
     def __str__(self) -> str:
         return f"{self.hits}/{self.valid_trials}"

@@ -1,6 +1,20 @@
 # Changelog
 
-## [Unreleased] — M0 Foundation
+## [Unreleased] — M2 statistics, reporting, replay (engine pieces)
+
+### Added
+- `core/stats.py`: Wilson 95% interval; regression verdicts PASS / FAIL / INCONCLUSIVE using the rule of three (spec §0A.5). Errored trials do not count toward N.
+- `Reproducibility.ci95`: Wilson interval serialized with every finding.
+- Measurement Card model and YAML loader with validation (spec §0A.6).
+- JSON run report (`reports/json.py`), written by `airteam report --run RUN_ID` to `results/<run>/report.json`.
+- `airteam replay RUN_ID --evidence`: renders a stored, chain-verified run with no network access. `--live` still exits 2 because it needs the executor.
+- `exit_code_for_verdicts`: maps verdicts to exit codes (spec §0A.16). FAIL takes precedence over INCONCLUSIVE, and an empty set is INCONCLUSIVE.
+
+### Fixed
+- `RunStore.load` failed on any run that had findings, because the computed `rate` field was rejected by `extra="forbid"` on reload.
+- `RunStore.load` now raises `StorageError`, not a raw `ValidationError`, for malformed run files.
+
+## M0 Foundation
 
 ### Added
 - Apache-2.0 license.

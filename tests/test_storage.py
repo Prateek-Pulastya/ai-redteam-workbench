@@ -5,7 +5,7 @@ import pytest
 
 from airteam.core.evidence import EvidenceChain
 from airteam.core.runs import RunMetadata, new_run_id
-from airteam.core.storage import EVIDENCE, RunStore, StorageError
+from airteam.core.storage import EVIDENCE, FINDINGS, RunStore, StorageError
 
 
 def _meta() -> RunMetadata:
@@ -57,6 +57,20 @@ def test_edited_evidence_fails_to_load(tmp_path: Path) -> None:
 def test_run_id_cannot_escape_root(tmp_path: Path) -> None:
     with pytest.raises(StorageError, match="escapes"):
         RunStore(tmp_path / "results").run_dir("../outside")
+
+
+def test_findings_round_trip(stored_run: tuple[RunStore, RunMetadata]) -> None:
+    store, meta = stored_run
+    _, _, findings = store.load(meta.run_id)
+    assert [f.finding_id for f in findings] == ["F-002", "F-001"]
+    assert findings[0].reproducibility.hits == 7
+
+
+def test_malformed_findings_is_storage_error(stored_run: tuple[RunStore, RunMetadata]) -> None:
+    store, meta = stored_run
+    (store.run_dir(meta.run_id) / FINDINGS).write_text('[{"finding_id": ""}]', encoding="utf-8")
+    with pytest.raises(StorageError, match="malformed"):
+        store.load(meta.run_id)
 
 
 def test_missing_run_is_storage_error(tmp_path: Path) -> None:
