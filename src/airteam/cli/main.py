@@ -13,11 +13,13 @@ from rich.table import Table
 from airteam import __version__
 from airteam.core.config import ConfigError, load_config
 from airteam.core.evidence import EvidenceRecord
-from airteam.core.exit_codes import ExitCode
+from airteam.core.exit_codes import ExitCode, exit_code_for_verdicts
 from airteam.core.findings import Finding
 from airteam.core.runs import RunMetadata
 from airteam.core.storage import RunStore, StorageError
+from airteam.core.trials import TrialRecordError
 from airteam.replay.evidence import render_evidence
+from airteam.replay.regression import evaluate_run, render_regression
 from airteam.reports.json import write_json_report
 
 console = Console()
@@ -149,6 +151,31 @@ def replay(
         _not_yet("replay --live", "M2, after the M1 executor")
     meta, records, findings = _load_run(RunStore(results_dir), run_id)
     render_evidence(console, meta, records, findings, full=full)
+
+
+@app.command()
+def regression(
+    run: Annotated[str, typer.Option("--run", help="Run ID whose trials to judge.")],
+    threshold: Annotated[
+        float,
+        typer.Option(
+            "--threshold", help="Maximum acceptable breach rate, in (0, 1]. 0.1 needs N >= 30."
+        ),
+    ] = 0.1,
+    results_dir: ResultsOption = Path("results"),
+) -> None:
+    """Judge recorded trials: PASS / FAIL / INCONCLUSIVE per attack (exit 0 / 1 / 3)."""
+    if not 0.0 < threshold <= 1.0:
+        err_console.print(f"[red]--threshold must be in (0, 1], got {threshold}.[/]")
+        raise typer.Exit(ExitCode.ERROR)
+    meta, records, _ = _load_run(RunStore(results_dir), run)
+    try:
+        results = evaluate_run(records, threshold)
+    except TrialRecordError as exc:
+        err_console.print(f"[red]{escape(str(exc))}[/]")
+        raise typer.Exit(ExitCode.ERROR) from exc
+    render_regression(console, meta.run_id, results, threshold)
+    raise typer.Exit(exit_code_for_verdicts(r.verdict for r, _ in results.values()))
 
 
 @app.command()
