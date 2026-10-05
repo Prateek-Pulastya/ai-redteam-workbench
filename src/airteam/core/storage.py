@@ -4,6 +4,8 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from airteam.core.evidence import EvidenceChain, EvidenceRecord, verify_chain
 from airteam.core.findings import Finding
 from airteam.core.runs import RunMetadata
@@ -51,13 +53,16 @@ class RunStore:
         except (OSError, json.JSONDecodeError) as exc:
             raise StorageError(f"cannot load run {run_id}: {exc}") from exc
 
-        head = manifest.pop("evidence_head", None)
-        meta = RunMetadata.model_validate(manifest)
-        records = tuple(EvidenceRecord.model_validate_json(line) for line in lines if line)
+        try:
+            head = manifest.pop("evidence_head", None)
+            meta = RunMetadata.model_validate(manifest)
+            records = tuple(EvidenceRecord.model_validate_json(line) for line in lines if line)
+            findings = [Finding.model_validate(f) for f in raw_findings]
+        except (AttributeError, ValidationError) as exc:
+            raise StorageError(f"run {run_id} has malformed files: {exc}") from exc
         if not verify_chain(records):
             raise StorageError(f"evidence chain for {run_id} failed verification")
         actual_head = records[-1].record_hash if records else None
         if records and head != actual_head:
             raise StorageError(f"evidence head mismatch for {run_id}")
-        findings = [Finding.model_validate(f) for f in raw_findings]
         return meta, records, findings

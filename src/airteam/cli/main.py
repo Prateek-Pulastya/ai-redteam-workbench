@@ -1,16 +1,24 @@
 """``airteam`` command-line entry point (spec §8)."""
 
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from airteam import __version__
 from airteam.core.config import ConfigError, load_config
+from airteam.core.evidence import EvidenceRecord
 from airteam.core.exit_codes import ExitCode
+from airteam.core.findings import Finding
+from airteam.core.runs import RunMetadata
+from airteam.core.storage import RunStore, StorageError
+from airteam.replay.evidence import render_evidence
+from airteam.reports.json import write_json_report
 
 console = Console()
 err_console = Console(stderr=True)
@@ -29,6 +37,14 @@ app.add_typer(ai_app, name="ai")
 ConfigOption = Annotated[
     Path, typer.Option("--config", "-c", help="Path to the assessment configuration.")
 ]
+ResultsOption = Annotated[
+    Path, typer.Option("--results-dir", help="Directory holding stored runs.")
+]
+
+
+class ReportFormat(StrEnum):
+    JSON = "json"
+    HTML = "html"
 
 
 def _version_callback(value: bool) -> None:
@@ -103,16 +119,55 @@ def benchmark() -> None:
     _not_yet("benchmark", "M4")
 
 
+def _load_run(
+    store: RunStore, run_id: str
+) -> tuple[RunMetadata, tuple[EvidenceRecord, ...], list[Finding]]:
+    try:
+        return store.load(run_id)
+    except StorageError as exc:
+        err_console.print(f"[red]{escape(str(exc))}[/]")
+        raise typer.Exit(ExitCode.ERROR) from exc
+
+
 @app.command()
-def replay(run_id: Annotated[str, typer.Argument(help="Run to replay.")]) -> None:
+def replay(
+    run_id: Annotated[str, typer.Argument(help="Run to replay.")],
+    evidence: Annotated[
+        bool, typer.Option("--evidence", help="Render recorded trials; no network (default).")
+    ] = False,
+    live: Annotated[
+        bool, typer.Option("--live", help="Re-execute against the target and compare.")
+    ] = False,
+    full: Annotated[bool, typer.Option("--full", help="Show complete evidence payloads.")] = False,
+    results_dir: ResultsOption = Path("results"),
+) -> None:
     """Replay a recorded run."""
-    _not_yet("replay", "M2")
+    if evidence and live:
+        err_console.print("[red]--evidence and --live are mutually exclusive.[/]")
+        raise typer.Exit(ExitCode.ERROR)
+    if live:
+        _not_yet("replay --live", "M2, after the M1 executor")
+    meta, records, findings = _load_run(RunStore(results_dir), run_id)
+    render_evidence(console, meta, records, findings, full=full)
 
 
 @app.command()
-def report(run: Annotated[str, typer.Option("--run", help="Run ID.")]) -> None:
+def report(
+    run: Annotated[str, typer.Option("--run", help="Run ID.")],
+    fmt: Annotated[
+        ReportFormat, typer.Option("--format", "-f", help="Report format.")
+    ] = ReportFormat.JSON,
+    results_dir: ResultsOption = Path("results"),
+) -> None:
     """Render a report for a run."""
-    _not_yet("report", "M1")
+    if fmt is ReportFormat.HTML:
+        _not_yet("report --format html", "M4")
+    try:
+        path = write_json_report(RunStore(results_dir), run)
+    except StorageError as exc:
+        err_console.print(f"[red]{escape(str(exc))}[/]")
+        raise typer.Exit(ExitCode.ERROR) from exc
+    console.print(f"Wrote {path}")
 
 
 @api_app.command("scan")
