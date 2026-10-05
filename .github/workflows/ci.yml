@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans the PR commit range and needs its parents
       - uses: astral-sh/setup-uv@v6
       - run: uv export --locked --no-dev --no-hashes --no-emit-project -o requirements.txt
       - run: uvx pip-audit -r requirements.txt
