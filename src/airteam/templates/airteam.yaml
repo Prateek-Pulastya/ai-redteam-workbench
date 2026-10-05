@@ -38,8 +38,8 @@ ai:
   provider: mock
 
 scan:
-  max_requests: 100
-  max_tokens: 10000
+  max_requests: 1000     # every provider attempt counts, retries included
+  max_tokens: 100000
   timeout_seconds: 30
   max_retries: 2
 

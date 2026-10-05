@@ -123,8 +123,9 @@ class AiConfig(StrictModel):
 
 
 class ScanBudget(StrictModel):
-    max_requests: int = Field(default=100, ge=1)
-    max_tokens: int = Field(default=10_000, ge=1)
+    max_requests: int = Field(default=1000, ge=1)
+    """Counts every provider attempt, retries included."""
+    max_tokens: int = Field(default=100_000, ge=1)
     max_concurrency: int = Field(default=4, ge=1)
     max_retries: int = Field(default=2, ge=0)
     timeout_seconds: float = Field(default=30.0, gt=0)

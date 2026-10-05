@@ -104,7 +104,7 @@ def test_attack_defaults() -> None:
         objective="unauthorized_instruction_following",
         property_id="no-canary-egress",
     )
-    assert attack.execution.trials == 10
+    assert attack.execution.trials == 30
     assert attack.execution.seed == 1337
 
 

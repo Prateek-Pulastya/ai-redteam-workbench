@@ -1,6 +1,19 @@
 # Changelog
 
-## [Unreleased] — M2 statistics, reporting, replay (engine pieces)
+## [Unreleased] — M1 execution engine
+
+### Added
+- Provider interface (`providers/base.py`) and a deterministic `MockProvider`: the same request always gives the same completion; responders get an RNG seeded from the request hash.
+- Canary oracle: exact match, then a normalized match that ignores case, spacing and punctuation. Canaries shorter than 12 alphanumerics are rejected to avoid false positives.
+- Schema oracle: positive when the output is not JSON or fails a strict contract model.
+- `BudgetTracker` (requests, tokens, run time; retries count as requests) and `RateLimiter`, both with injectable clocks.
+- Trial runner (`engine/runner.py`): applies the attack's execution policy (per-trial seeds, temperature), retries transient provider errors, records every request, response and trial in the evidence chain. A budget stop is recorded and leaves the verdict INCONCLUSIVE instead of a false PASS.
+
+### Changed
+- Default `ExecutionPolicy.trials` 10 → 30, so 0 breaches can PASS at the default 10% threshold.
+- Default scan budget: `max_requests` 100 → 1000, `max_tokens` 10,000 → 100,000.
+
+## M2 statistics, reporting, replay (engine pieces)
 
 ### Added
 - `core/stats.py`: Wilson 95% interval; regression verdicts PASS / FAIL / INCONCLUSIVE using the rule of three (spec §0A.5). Errored trials do not count toward N.
