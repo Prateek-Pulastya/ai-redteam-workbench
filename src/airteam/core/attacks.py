@@ -27,7 +27,8 @@ class SuccessRule(StrictModel):
 
 
 class ExecutionPolicy(StrictModel):
-    trials: int = Field(default=10, ge=1, le=10_000)
+    trials: int = Field(default=30, ge=1, le=10_000)
+    """30 is the smallest N for which 0 breaches can PASS at the default 10% threshold."""
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     seed: int | None = 1337
     success_rule: SuccessRule = SuccessRule()

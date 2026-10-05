@@ -57,7 +57,7 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]  # asserts and deliberately fake tokens
+"tests/**" = ["S101", "S105", "S106", "S311"]  # asserts, fake tokens, seeded RNG
 
 [tool.mypy]
 python_version = "3.12"
