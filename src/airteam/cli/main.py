@@ -18,6 +18,8 @@ from airteam.core.findings import Finding
 from airteam.core.runs import RunMetadata
 from airteam.core.storage import RunStore, StorageError
 from airteam.core.trials import TrialRecordError
+from airteam.engine.cases import CaseError, load_cases
+from airteam.engine.scan import ScanError, ScanResult, run_scan, select_provider
 from airteam.replay.evidence import render_evidence
 from airteam.replay.regression import evaluate_run, render_regression
 from airteam.reports.json import write_json_report
@@ -41,6 +43,15 @@ ConfigOption = Annotated[
 ]
 ResultsOption = Annotated[
     Path, typer.Option("--results-dir", help="Directory holding stored runs.")
+]
+CasesOption = Annotated[
+    Path, typer.Option("--cases", help="Directory of airteam/case@1 YAML files.")
+]
+ThresholdOption = Annotated[
+    float,
+    typer.Option(
+        "--threshold", help="Maximum acceptable breach rate, in (0, 1]. 0.1 needs N >= 30."
+    ),
 ]
 
 
@@ -109,10 +120,54 @@ def targets(config: ConfigOption = Path("airteam.yaml")) -> None:
     console.print(f"config hash: {cfg.config_hash()}")
 
 
+def _check_threshold(threshold: float) -> None:
+    if not 0.0 < threshold <= 1.0:
+        err_console.print(f"[red]--threshold must be in (0, 1], got {threshold}.[/]")
+        raise typer.Exit(ExitCode.ERROR)
+
+
+def _render_scan(result: ScanResult) -> None:
+    table = Table(title=f"Scan {result.meta.run_id}  ({result.meta.model_ids[0]})")
+    for column in ("attack", "verdict", "breach", "finding"):
+        table.add_column(column)
+    for o in result.outcomes:
+        v = o.verdict
+        finding = "-" if o.finding is None else f"{o.finding.finding_id} {o.finding.severity.value}"
+        table.add_row(
+            escape(o.case.spec.attack.id),
+            v.verdict.value.upper(),
+            f"{v.hits}/{v.valid_trials}",
+            finding,
+        )
+    console.print(table)
+    if not result.complete:
+        console.print("[yellow]Scan budget exhausted: remaining trials were not run.[/]")
+    console.print(f"Stored {result.path}")
+
+
+def _scan(config: Path, cases_dir: Path, threshold: float, results_dir: Path) -> None:
+    _check_threshold(threshold)
+    try:
+        cfg = load_config(config)
+        cases = load_cases(cases_dir)
+        provider = select_provider(cfg)
+    except (ConfigError, CaseError, ScanError) as exc:
+        err_console.print(f"[red]{escape(str(exc))}[/]")
+        raise typer.Exit(ExitCode.ERROR) from exc
+    result = run_scan(cfg, cases, provider, RunStore(results_dir), threshold)
+    _render_scan(result)
+    raise typer.Exit(result.exit_code)
+
+
 @app.command()
-def scan(config: ConfigOption = Path("airteam.yaml")) -> None:
-    """Run all configured AI and API checks."""
-    _not_yet("scan", "M1")
+def scan(
+    config: ConfigOption = Path("airteam.yaml"),
+    cases: CasesOption = Path("attacks"),
+    threshold: ThresholdOption = 0.1,
+    results_dir: ResultsOption = Path("results"),
+) -> None:
+    """Run case files against the target: exit 1 on fail_on findings, 3 if inconclusive."""
+    _scan(config, cases, threshold, results_dir)
 
 
 @app.command()
@@ -156,18 +211,11 @@ def replay(
 @app.command()
 def regression(
     run: Annotated[str, typer.Option("--run", help="Run ID whose trials to judge.")],
-    threshold: Annotated[
-        float,
-        typer.Option(
-            "--threshold", help="Maximum acceptable breach rate, in (0, 1]. 0.1 needs N >= 30."
-        ),
-    ] = 0.1,
+    threshold: ThresholdOption = 0.1,
     results_dir: ResultsOption = Path("results"),
 ) -> None:
     """Judge recorded trials: PASS / FAIL / INCONCLUSIVE per attack (exit 0 / 1 / 3)."""
-    if not 0.0 < threshold <= 1.0:
-        err_console.print(f"[red]--threshold must be in (0, 1], got {threshold}.[/]")
-        raise typer.Exit(ExitCode.ERROR)
+    _check_threshold(threshold)
     meta, records, _ = _load_run(RunStore(results_dir), run)
     try:
         results = evaluate_run(records, threshold)
@@ -204,6 +252,11 @@ def api_scan(config: ConfigOption = Path("airteam.yaml")) -> None:
 
 
 @ai_app.command("scan")
-def ai_scan(config: ConfigOption = Path("airteam.yaml")) -> None:
-    """Run AI security checks."""
-    _not_yet("ai scan", "M1")
+def ai_scan(
+    config: ConfigOption = Path("airteam.yaml"),
+    cases: CasesOption = Path("attacks/ai"),
+    threshold: ThresholdOption = 0.1,
+    results_dir: ResultsOption = Path("results"),
+) -> None:
+    """Run AI case files (default directory: attacks/ai)."""
+    _scan(config, cases, threshold, results_dir)
