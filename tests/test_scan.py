@@ -113,7 +113,7 @@ def test_scan_errors_exit_2(tmp_path: Path, setup: str, message: str) -> None:
     extra = ["--threshold", "0"] if setup == "threshold" else []
     result = _scan(tmp_path, config, cases, *extra)
     assert result.exit_code == ExitCode.ERROR
-    assert message in result.output
+    assert message in " ".join(result.output.split())  # Rich wraps long lines
     assert not (tmp_path / "results").exists()  # nothing ran, nothing stored
 
 
