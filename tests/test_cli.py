@@ -117,10 +117,8 @@ def test_report_errors_exit_2(tmp_path: Path, args: list[str]) -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["scan"],
         ["benchmark"],
         ["api", "scan"],
-        ["ai", "scan"],
     ],
 )
 def test_unimplemented_commands_exit_with_error(args: list[str]) -> None:

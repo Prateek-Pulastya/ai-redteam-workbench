@@ -3,6 +3,9 @@
 ## [Unreleased] — M1 execution engine
 
 ### Added
+- Case file format `airteam/case@1` (`docs/case-format.md`) and loader (`engine/cases.py`): pure YAML data, strict validation at load time. Canaries are allowed only in hidden context, placeholders are filled in a single pass, schema contracts use strict types, and an induction matcher may not match a canary.
+- `airteam scan` / `airteam ai scan`: load config and cases, run, store the run, build findings (breaches ≥ `success_rule.k`, deterministic `F-001…` IDs, evidence refs), then exit 1 on `fail_on` findings, 3 if any case is inconclusive, 2 on load/config/provider errors.
+- The `mock` provider stands in for the paired playground: the `vulnerable` variant echoes every message, other variants refuse.
 - Provider interface (`providers/base.py`) and a deterministic `MockProvider`: the same request always gives the same completion; responders get an RNG seeded from the request hash.
 - Canary oracle: exact match, then a normalized match that ignores case, spacing and punctuation. Canaries shorter than 12 alphanumerics are rejected to avoid false positives.
 - Schema oracle: positive when the output is not JSON or fails a strict contract model.
