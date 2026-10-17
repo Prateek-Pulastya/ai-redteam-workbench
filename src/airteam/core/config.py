@@ -118,8 +118,17 @@ class ApiConfig(StrictModel):
 
 class AiConfig(StrictModel):
     endpoint: AnyHttpUrl | None = None
+    """For ``openai_compatible``: the base URL, e.g. ``http://localhost:11434/v1``."""
     provider: Literal["http", "openai_compatible", "mock"] = "mock"
     model: str | None = None
+    api_key_env: str | None = Field(default=None, pattern=r"^[A-Z_][A-Z0-9_]*$")
+    """Name of the environment variable holding the API key; never the key itself."""
+
+    @model_validator(mode="after")
+    def _network_provider_needs_target(self) -> Self:
+        if self.provider == "openai_compatible" and (self.endpoint is None or not self.model):
+            raise ValueError("provider 'openai_compatible' needs both 'endpoint' and 'model'")
+        return self
 
 
 class ScanBudget(StrictModel):

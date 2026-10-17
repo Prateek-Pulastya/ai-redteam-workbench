@@ -108,7 +108,7 @@ def test_k_above_trials_is_a_load_error(tmp_path: Path) -> None:
     ],
 )
 def test_scan_errors_exit_2(tmp_path: Path, setup: str, message: str) -> None:
-    config = _config(tmp_path, provider="openai_compatible" if setup == "provider" else "mock")
+    config = _config(tmp_path, provider="http" if setup == "provider" else "mock")
     cases = tmp_path / "missing" if setup == "cases" else _cases(tmp_path)
     extra = ["--threshold", "0"] if setup == "threshold" else []
     result = _scan(tmp_path, config, cases, *extra)
