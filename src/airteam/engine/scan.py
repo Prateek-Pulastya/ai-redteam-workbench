@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from airteam import __version__
-from airteam.core.config import AirteamConfig
+from airteam.core.config import AirteamConfig, is_loopback
 from airteam.core.evidence import EvidenceChain, EvidenceRecord
 from airteam.core.exit_codes import ExitCode
 from airteam.core.findings import Finding, Reproducibility, assess_confidence
@@ -54,6 +54,12 @@ def select_provider(cfg: AirteamConfig) -> LLMProvider:
                 raise ScanError(f"environment variable {cfg.ai.api_key_env} is not set")
         if cfg.ai.endpoint is None or not cfg.ai.model:  # AiConfig validates; keeps mypy honest
             raise ScanError("provider 'openai_compatible' needs both 'endpoint' and 'model'")
+        endpoint = cfg.ai.endpoint
+        if api_key and endpoint.scheme != "https" and not is_loopback(endpoint.host or ""):
+            # A bearer key over plain http to a remote host would be readable on the wire.
+            raise ScanError(
+                f"refusing to send the API key over plain http to {endpoint.host}; use https"
+            )
         return OpenAICompatibleProvider(
             str(cfg.ai.endpoint), cfg.ai.model, api_key, cfg.scan.timeout_seconds
         )

@@ -4,7 +4,7 @@
 
 ### Added
 - `openai_compatible` provider (`providers/openai_compatible.py`) for OpenAI, vLLM, Ollama, LM Studio and gateways. Uses `scan.timeout_seconds`; 429, 5xx, timeouts and connection errors are retryable, other errors are not. Redirects are refused because they could leave the authorization scope. Tool-role case messages are sent as answers to a synthetic assistant tool call, so they stay in the tool channel.
-- `ai.api_key_env`: the API key is read from the named environment variable at scan time. It is never stored in config, evidence or error messages.
+- `ai.api_key_env`: the API key is read from the named environment variable at scan time. It is never stored in config, evidence or error messages, and is only sent over https or to a loopback host.
 
 ### Changed
 - `ai.provider: openai_compatible` now requires `ai.endpoint` and `ai.model` at config load.

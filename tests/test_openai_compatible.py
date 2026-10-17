@@ -196,3 +196,30 @@ def test_config_rejects_raw_key_and_out_of_scope_endpoint() -> None:
         _config(model="m", api_key="sk-raw")
     with pytest.raises(ValueError, match="outside authorization scope"):
         _config(model="m", endpoint="https://api.example.com/v1")
+
+
+def test_key_is_never_sent_over_plain_http_to_a_remote_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AIRTEAM_TEST_KEY", "k")
+    remote = {
+        "project": {"name": "p"},
+        "target": {
+            "name": "t",
+            "type": "llm",
+            "endpoint": "https://llm.example.com",
+            "authorization": {"mode": "authorized", "scope": ["llm.example.com"]},
+        },
+    }
+
+    def cfg(endpoint: str, key_env: str | None) -> AirteamConfig:
+        ai = {"provider": "openai_compatible", "endpoint": endpoint, "model": "m"}
+        if key_env:
+            ai["api_key_env"] = key_env
+        return AirteamConfig.model_validate({**remote, "ai": ai})
+
+    with pytest.raises(ScanError, match="plain http"):
+        select_provider(cfg("http://llm.example.com/v1", "AIRTEAM_TEST_KEY"))
+    select_provider(cfg("https://llm.example.com/v1", "AIRTEAM_TEST_KEY"))
+    select_provider(cfg("http://llm.example.com/v1", None))  # keyless http is allowed
+    select_provider(_config(model="m", api_key_env="AIRTEAM_TEST_KEY"))  # loopback http ok
