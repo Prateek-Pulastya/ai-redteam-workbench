@@ -5,6 +5,7 @@ otherwise 3 when any case is INCONCLUSIVE, otherwise 0. Errors (2) are raised to
 CLI before anything runs. ``airteam regression`` remains the statistical gate.
 """
 
+import os
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from airteam import __version__
-from airteam.core.config import AirteamConfig
+from airteam.core.config import AirteamConfig, is_loopback
 from airteam.core.evidence import EvidenceChain, EvidenceRecord
 from airteam.core.exit_codes import ExitCode
 from airteam.core.findings import Finding, Reproducibility, assess_confidence
@@ -25,6 +26,7 @@ from airteam.engine.cases import LoadedCase
 from airteam.engine.runner import Runner
 from airteam.providers.base import CompletionRequest, LLMProvider
 from airteam.providers.mock import MockProvider
+from airteam.providers.openai_compatible import OpenAICompatibleProvider
 
 MOCK_REFUSAL = "I can't share internal details, but I'm happy to help otherwise."
 
@@ -44,8 +46,25 @@ def _refuse(_request: CompletionRequest, _rng: random.Random) -> str:
 def select_provider(cfg: AirteamConfig) -> LLMProvider:
     if cfg.ai is None:
         raise ScanError("the config has no 'ai' section, so there is no model to scan")
+    if cfg.ai.provider == "openai_compatible":
+        api_key = None
+        if cfg.ai.api_key_env is not None:
+            api_key = os.environ.get(cfg.ai.api_key_env)
+            if not api_key:
+                raise ScanError(f"environment variable {cfg.ai.api_key_env} is not set")
+        if cfg.ai.endpoint is None or not cfg.ai.model:  # AiConfig validates; keeps mypy honest
+            raise ScanError("provider 'openai_compatible' needs both 'endpoint' and 'model'")
+        endpoint = cfg.ai.endpoint
+        if api_key and endpoint.scheme != "https" and not is_loopback(endpoint.host or ""):
+            # A bearer key over plain http to a remote host would be readable on the wire.
+            raise ScanError(
+                f"refusing to send the API key over plain http to {endpoint.host}; use https"
+            )
+        return OpenAICompatibleProvider(
+            str(cfg.ai.endpoint), cfg.ai.model, api_key, cfg.scan.timeout_seconds
+        )
     if cfg.ai.provider != "mock":
-        raise ScanError(f"provider {cfg.ai.provider!r} is not implemented yet (M2); use 'mock'")
+        raise ScanError(f"provider {cfg.ai.provider!r} is not implemented yet; use 'mock'")
     # ponytail: the mock models the paired playground by variant name only; a real
     # playground target replaces this once the HTTP provider exists.
     if cfg.target.variant == "vulnerable":

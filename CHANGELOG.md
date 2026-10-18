@@ -1,6 +1,15 @@
 # Changelog
 
-## [Unreleased] — M1 execution engine
+## [Unreleased] — M2 providers
+
+### Added
+- `openai_compatible` provider (`providers/openai_compatible.py`) for OpenAI, vLLM, Ollama, LM Studio and gateways. Uses `scan.timeout_seconds`; 429, 5xx, timeouts and connection errors are retryable, other errors are not. Redirects are refused because they could leave the authorization scope. Tool-role case messages are sent as answers to a synthetic assistant tool call, so they stay in the tool channel.
+- `ai.api_key_env`: the API key is read from the named environment variable at scan time. It is never stored in config, evidence or error messages, and is only sent over https or to a loopback host.
+
+### Changed
+- `ai.provider: openai_compatible` now requires `ai.endpoint` and `ai.model` at config load.
+
+## M1 execution engine
 
 ### Added
 - Case file format `airteam/case@1` (`docs/case-format.md`) and loader (`engine/cases.py`): pure YAML data, strict validation at load time. Canaries are allowed only in hidden context, placeholders are filled in a single pass, schema contracts use strict types, and an induction matcher may not match a canary.

@@ -36,6 +36,11 @@ api:
 ai:
   endpoint: http://localhost:8000/chat
   provider: mock
+  # A real model through any OpenAI-compatible server (in scope, e.g. local Ollama):
+  # endpoint: http://localhost:11434/v1
+  # provider: openai_compatible
+  # model: llama3.1
+  # api_key_env: OPENAI_API_KEY    # variable NAME only; leave out for keyless local servers
 
 scan:
   max_requests: 1000     # every provider attempt counts, retries included
