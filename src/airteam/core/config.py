@@ -176,6 +176,11 @@ class AirteamConfig(StrictModel):
         if self.ai is not None and self.ai.endpoint is not None:
             endpoints.append(self.ai.endpoint)
         for url in endpoints:
+            if url.username or url.password:
+                # Credentials in a URL end up in run metadata and evidence; use api_key_env.
+                raise ValueError(
+                    f"endpoint for host {url.host} contains credentials; use api_key_env"
+                )
             if url.host is None or not host_in_scope(url.host, scope):
                 raise ValueError(f"endpoint {url} is outside authorization scope {list(scope)}")
         return self

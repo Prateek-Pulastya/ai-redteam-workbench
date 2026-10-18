@@ -69,6 +69,10 @@ class HttpProvider:
         client: httpx.Client | None = None,
     ) -> None:
         self._url = url
+        parts = httpx.URL(url)
+        # Recorded in run metadata and evidence, so no userinfo and no query string.
+        port = f":{parts.port}" if parts.port else ""
+        self._safe_url = f"{parts.scheme}://{parts.host}{port}{parts.path}"
         self._messages_field = messages_field
         self._response_path = response_path
         self._model = model
@@ -77,7 +81,7 @@ class HttpProvider:
 
     @property
     def model_id(self) -> str:
-        return f"http:{self._model or self._url}"
+        return f"http:{self._model or self._safe_url}"
 
     def complete(self, request: CompletionRequest) -> Completion:
         body: dict[str, Any] = {

@@ -133,3 +133,13 @@ def test_selection_applies_key_rules(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AIRTEAM_TEST_KEY", raising=False)
     with pytest.raises(ScanError, match="is not set"):
         select_provider(_cfg(endpoint=URL, api_key_env="AIRTEAM_TEST_KEY"))
+
+
+def test_model_id_never_carries_credentials_or_query() -> None:
+    provider = HttpProvider("http://u:p@localhost:8000/chat?token=t", None, 5.0)
+    assert provider.model_id == "http:http://localhost:8000/chat"
+
+
+def test_config_rejects_credentials_in_endpoints() -> None:
+    with pytest.raises(ValueError, match="contains credentials"):
+        _cfg(endpoint="http://user:pass@localhost:8000/chat")
