@@ -116,6 +116,14 @@ class ApiConfig(StrictModel):
         return self
 
 
+class HttpProviderConfig(StrictModel):
+    """Request/response shape for ``provider: http`` (a custom chat endpoint)."""
+
+    messages_field: str = Field(default="messages", pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
+    response_path: str = Field(default="text", pattern=r"^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$")
+    """Dotted path to the reply text; digits index lists, e.g. ``choices.0.message.content``."""
+
+
 class AiConfig(StrictModel):
     endpoint: AnyHttpUrl | None = None
     """For ``openai_compatible``: the base URL, e.g. ``http://localhost:11434/v1``."""
@@ -123,11 +131,14 @@ class AiConfig(StrictModel):
     model: str | None = None
     api_key_env: str | None = Field(default=None, pattern=r"^[A-Z_][A-Z0-9_]*$")
     """Name of the environment variable holding the API key; never the key itself."""
+    http: HttpProviderConfig = HttpProviderConfig()
 
     @model_validator(mode="after")
     def _network_provider_needs_target(self) -> Self:
         if self.provider == "openai_compatible" and (self.endpoint is None or not self.model):
             raise ValueError("provider 'openai_compatible' needs both 'endpoint' and 'model'")
+        if self.provider == "http" and self.endpoint is None:
+            raise ValueError("provider 'http' needs 'endpoint'")
         return self
 
 

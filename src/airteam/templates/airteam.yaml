@@ -41,6 +41,12 @@ ai:
   # provider: openai_compatible
   # model: llama3.1
   # api_key_env: OPENAI_API_KEY    # variable NAME only; leave out for keyless local servers
+  # Or your own app's chat endpoint (tests the application, not just the model):
+  # endpoint: http://localhost:8000/chat
+  # provider: http
+  # http:
+  #   messages_field: messages       # request key holding [{role, content}, ...]
+  #   response_path: reply           # dotted path to the reply text in the JSON response
 
 scan:
   max_requests: 1000     # every provider attempt counts, retries included

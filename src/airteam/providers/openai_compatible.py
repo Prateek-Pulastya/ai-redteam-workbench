@@ -10,13 +10,8 @@ from typing import Any
 
 import httpx
 
-from airteam.providers.base import (
-    Completion,
-    CompletionRequest,
-    ProviderError,
-    TransientProviderError,
-    approx_tokens,
-)
+from airteam.providers.base import Completion, CompletionRequest, ProviderError, approx_tokens
+from airteam.providers.http import post_json
 
 TOOL_NAME = "context_lookup"
 
@@ -78,21 +73,8 @@ class OpenAICompatibleProvider:
         }
         if request.seed is not None:
             body["seed"] = request.seed
+        data = post_json(self._client, self._url, body, self._headers)
         try:
-            response = self._client.post(self._url, json=body, headers=self._headers)
-        except httpx.TimeoutException as exc:
-            raise TransientProviderError("request timed out") from exc
-        except httpx.TransportError as exc:
-            raise TransientProviderError(f"connection failed: {type(exc).__name__}") from exc
-
-        status = response.status_code
-        if status == 429 or status >= 500:
-            raise TransientProviderError(f"HTTP {status}")
-        if status >= 300:
-            # Response bodies are left out on purpose: some servers echo credentials.
-            raise ProviderError(f"HTTP {status}")
-        try:
-            data = response.json()
             text = data["choices"][0]["message"].get("content") or ""
             if not isinstance(text, str):
                 raise TypeError("content is not text")

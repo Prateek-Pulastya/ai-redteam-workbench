@@ -14,12 +14,12 @@ FIXTURES = Path(__file__).parent / "fixtures" / "cases"
 runner = CliRunner()
 
 
-def _config(tmp_path: Path, variant: str = "vulnerable", provider: str = "mock") -> Path:
+def _config(tmp_path: Path, variant: str = "vulnerable", provider: str = "mock", **ai: str) -> Path:
     assert runner.invoke(app, ["init", str(tmp_path / "airteam.yaml")]).exit_code == 0
     path = tmp_path / "airteam.yaml"
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     data["target"]["variant"] = variant
-    data["ai"]["provider"] = provider
+    data["ai"].update(provider=provider, **ai)
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     return path
 
@@ -102,13 +102,17 @@ def test_k_above_trials_is_a_load_error(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("setup", "message"),
     [
-        ("provider", "not implemented yet"),
+        ("provider", "AIRTEAM_UNSET_TEST_KEY is not set"),
         ("cases", "does not exist"),
         ("threshold", "--threshold"),
     ],
 )
 def test_scan_errors_exit_2(tmp_path: Path, setup: str, message: str) -> None:
-    config = _config(tmp_path, provider="http" if setup == "provider" else "mock")
+    # The key check runs before any request, so the http provider never touches the network.
+    if setup == "provider":
+        config = _config(tmp_path, provider="http", api_key_env="AIRTEAM_UNSET_TEST_KEY")
+    else:
+        config = _config(tmp_path)
     cases = tmp_path / "missing" if setup == "cases" else _cases(tmp_path)
     extra = ["--threshold", "0"] if setup == "threshold" else []
     result = _scan(tmp_path, config, cases, *extra)

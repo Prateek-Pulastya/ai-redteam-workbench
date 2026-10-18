@@ -129,7 +129,7 @@ def test_client_errors_and_redirects_are_not_retried(status: int) -> None:
 )
 def test_malformed_responses(body: bytes) -> None:
     provider, _ = _provider(lambda _r: httpx.Response(200, content=body))
-    with pytest.raises(ProviderError, match="malformed"):
+    with pytest.raises(ProviderError, match=r"malformed|not JSON"):
         provider.complete(_request())
 
 
