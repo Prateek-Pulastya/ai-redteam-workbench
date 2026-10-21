@@ -168,7 +168,7 @@ def run_scan(
         if cfg.ai is None or cfg.ai.provider == "mock"
         else RateLimiter(cfg.scan.rate_limit_per_second)
     )
-    runner = Runner(provider, chain, BudgetTracker(cfg.scan), limiter)
+    runner = Runner(provider, chain, BudgetTracker(cfg.scan), limiter, cfg.scan.max_concurrency)
     complete = runner.run_all([c.trial_case for c in cases])
 
     recorded = _trials_with_seq(chain.records)

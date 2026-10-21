@@ -53,6 +53,7 @@ scan:
   max_tokens: 100000
   timeout_seconds: 30
   max_retries: 2
+  max_concurrency: 4     # trials of one case sent in parallel; evidence stays in order
 
 policy:
   fail_on:
