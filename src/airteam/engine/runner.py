@@ -10,6 +10,7 @@ real credentials in requests. Canaries are synthetic and are recorded as-is.
 """
 
 from collections.abc import Callable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
 from airteam.core.attacks import Attack
@@ -58,11 +59,15 @@ class Runner:
         chain: EvidenceChain,
         budget: BudgetTracker,
         limiter: RateLimiter | None = None,
+        max_concurrency: int = 1,
     ) -> None:
+        if max_concurrency < 1:
+            raise ValueError("max_concurrency must be at least 1")
         self._provider = provider
         self._chain = chain
         self._budget = budget
         self._limiter = limiter
+        self._concurrency = max_concurrency
 
     def run_all(self, cases: Sequence[TrialCase]) -> bool:
         """Run every case in order. False if the budget stopped the run early."""
@@ -78,55 +83,71 @@ class Runner:
         return True
 
     def run(self, case: TrialCase) -> list[Trial]:
-        """Execute all planned trials of one case.
+        """Execute all planned trials of one case, up to ``max_concurrency`` at a time.
 
-        On budget exhaustion the completed trials stay recorded, a
-        ``budget_exhausted`` record is appended, and the exception propagates:
-        the missing trials lower N, so the verdict becomes INCONCLUSIVE rather
-        than a false PASS.
+        Provider calls run in parallel, but evidence is appended afterwards in trial
+        order, so the chain is identical to a sequential run and reruns reproduce.
+        Every trial that was actually sent is recorded. On budget exhaustion a
+        ``budget_exhausted`` record follows and the exception propagates: the
+        missing trials lower N, so the verdict becomes INCONCLUSIVE rather than a
+        false PASS.
         """
+        # ponytail: parallel within a case only; cases still run one after another.
         policy = case.attack.execution
+        requests = [
+            case.build_request(i).model_copy(
+                update={"temperature": policy.temperature, "seed": trial_seed(policy.seed, i)}
+            )
+            for i in range(policy.trials)
+        ]
+        with ThreadPoolExecutor(max_workers=self._concurrency) as pool:
+            futures = [pool.submit(self._complete, r) for r in requests]
+            outcomes = [_outcome(f) for f in futures]
+
         trials: list[Trial] = []
-        for index in range(policy.trials):
-            try:
-                trials.append(self._run_trial(case, index))
-            except BudgetExceeded as exc:
-                self._chain.append(
-                    BUDGET_RECORD_KIND,
-                    {
-                        "attack_id": case.attack.id,
-                        "completed_trials": len(trials),
-                        "planned_trials": policy.trials,
-                        "reason": str(exc),
-                    },
-                )
-                raise
+        stopped: BudgetExceeded | None = None
+        for index, (request, outcome) in enumerate(zip(requests, outcomes, strict=True)):
+            if isinstance(outcome, BudgetExceeded):
+                stopped = stopped or outcome  # never sent: nothing to record
+                continue
+            trials.append(self._record(case, index, request, outcome))
+        if stopped is not None:
+            self._chain.append(
+                BUDGET_RECORD_KIND,
+                {
+                    "attack_id": case.attack.id,
+                    "completed_trials": len(trials),
+                    "planned_trials": policy.trials,
+                    "reason": str(stopped),
+                },
+            )
+            raise stopped
         return trials
 
-    def _run_trial(self, case: TrialCase, index: int) -> Trial:
-        policy = case.attack.execution
-        request = case.build_request(index).model_copy(
-            update={"temperature": policy.temperature, "seed": trial_seed(policy.seed, index)}
-        )
+    def _record(
+        self,
+        case: TrialCase,
+        index: int,
+        request: CompletionRequest,
+        outcome: Completion | ProviderError,
+    ) -> Trial:
         attack_id = case.attack.id
         self._chain.append(
             "request",
             {"attack_id": attack_id, "trial": index, "request": request.model_dump(mode="json")},
         )
-        try:
-            completion = self._complete(request)
-        except ProviderError as exc:
-            trial = Trial(index=index, error=f"provider error: {exc}")
+        if isinstance(outcome, ProviderError):
+            trial = Trial(index=index, error=f"provider error: {outcome}")
         else:
             self._chain.append(
                 "response",
                 {
                     "attack_id": attack_id,
                     "trial": index,
-                    "completion": completion.model_dump(mode="json"),
+                    "completion": outcome.model_dump(mode="json"),
                 },
             )
-            observation = Observation(text=completion.text)
+            observation = Observation(text=outcome.text)
             trial = Trial(
                 index=index,
                 oracle_results=tuple(o.evaluate(observation) for o in case.oracles),
@@ -150,3 +171,10 @@ class Runner:
                 continue
             self._budget.add_tokens(completion.total_tokens)
             return completion
+
+
+def _outcome(future: "Future[Completion]") -> Completion | ProviderError | BudgetExceeded:
+    try:
+        return future.result()
+    except (ProviderError, BudgetExceeded) as exc:
+        return exc

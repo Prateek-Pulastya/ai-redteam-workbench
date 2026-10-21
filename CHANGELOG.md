@@ -8,6 +8,8 @@
 
 - `http` provider (`providers/http.py`) for custom chat endpoints, such as your own app's API. It POSTs the case messages under `ai.http.messages_field` and reads the reply at the dotted `ai.http.response_path`. It shares timeouts, retry classification, redirect refusal and API-key rules with `openai_compatible` through one `post_json` helper.
 
+- Concurrent trials: the runner sends up to `scan.max_concurrency` trials of a case in parallel (thread pool). Evidence is still appended in trial order, so the chain is byte-identical to a sequential run. `BudgetTracker` and `RateLimiter` are thread-safe, request budgets stay exact under concurrency, and every trial that was actually sent is recorded before a budget stop.
+
 ### Changed
 - `ai.provider: http` requires `ai.endpoint` at config load.
 - `ai.provider: openai_compatible` now requires `ai.endpoint` and `ai.model` at config load.
