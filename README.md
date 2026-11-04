@@ -4,12 +4,13 @@
 
 > The model will be fooled. The workbench proves whether your application contained it.
 
-**Status:** pre-alpha (milestone M0: foundation). Nothing here scans anything yet.
+**Status:** pre-alpha. `airteam scan` runs against a mock, an OpenAI-compatible server or your own HTTP chat endpoint. API testing (M3) and the benchmark (M4) aren't built yet. No published results against a real model so far.
 
 ## What exists today
 
-- `airteam` CLI skeleton (`init`, `targets`; other commands are stubs that exit with code 2)
-- Domain model: security properties, oracles, controls, variants, trials, findings, oracle-based confidence rules, hash-chained evidence
+- `airteam scan`: runs the OWASP LLM Top 10 attack pack in `attacks/ai/`, 30 trials per attack, exiting 1 on findings and 3 if inconclusive
+- `airteam replay`, `report` and `regression`: work from recorded runs
+- Hash-chained evidence for every trial, with canary and schema oracles
 - Configuration with enforced authorization scope (loopback-only in `local` mode)
 
 ## Quick start (development)
