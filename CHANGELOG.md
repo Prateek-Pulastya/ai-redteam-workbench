@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased] — M2 providers
+## 0.1.0a1 — 2026-11-14 (first alpha: M1 engine + M2 providers; includes every section below)
+
+### M2 providers
+
+### Docs
+- README control-mapping table: each test and guardrail mapped to OWASP LLM Top 10 (2025), EU AI Act Art. 15, NIST AI RMF (and AI 600-1) and ISO/IEC 42001 Annex A where it genuinely fits; proxies and gaps are marked. `tests/test_readme_mapping.py` fails if a shipped case has no row.
 
 ### Added
 - `openai_compatible` provider (`providers/openai_compatible.py`) for OpenAI, vLLM, Ollama, LM Studio and gateways. Uses `scan.timeout_seconds`; 429, 5xx, timeouts and connection errors are retryable, other errors are not. Redirects are refused because they could leave the authorization scope. Tool-role case messages are sent as answers to a synthetic assistant tool call, so they stay in the tool channel.
